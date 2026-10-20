@@ -149,6 +149,10 @@ tbody tr:last-child td { border-bottom: 0; }
 .primary:hover { background: #10583f; }
 .content { padding-top: 30px; }
 .topbar { min-height: 62px; }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.local-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid #e8e5cb; border-radius: 30px; background: #fbf9ec; color: #776d32; font-size: 9px; font-weight: 800; letter-spacing: .6px; }
+.local-badge span { width: 7px; height: 7px; border-radius: 50%; background: #b29526; }
+.local-notice { margin: -7px 0 17px; }
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 200px 1fr; }
   .content { padding: 25px 20px; }
@@ -183,6 +187,8 @@ tbody tr:last-child td { border-bottom: 0; }
   .form-grid { grid-template-columns: 1fr; }
   .field.full { grid-column: auto; }
   .today { font-size: 10px; }
+  .topbar-right { gap: 7px; }
+  .local-badge { padding: 5px 7px; font-size: 8px; }
 }
 @media (min-width: 641px) {
   .mobile-nav { display: none; }
