@@ -144,7 +144,10 @@ function loadStore() {
     version: 1,
     starter_catalogue_initialized: parsed?.starter_catalogue_initialized === true,
     settings: { ...DEFAULT_SETTINGS, ...(parsed?.settings || {}) },
-    products: parsed?.products || [],
+    products: (parsed?.products || []).map((product) => ({
+      ...product,
+      buying_price: Number(product.buying_price) || 0,
+    })),
     sales: parsed?.sales || [],
     movements: parsed?.movements || [],
   };
@@ -171,6 +174,7 @@ function createStarterProducts() {
     name,
     category,
     unit_price: 0,
+    buying_price: 0,
     stock: 0,
     reorder_level: 0,
     created_at: now,
@@ -254,14 +258,14 @@ function renderInventory() {
   const filtered = store.products.filter((item) => `${item.name} ${item.sku} ${item.category || ""}`.toLowerCase().includes(productSearch.toLowerCase()));
   const rows = filtered.map((item) => `
     <tr><td><div class="product-main">${esc(item.name)}</div><div class="product-sub">${esc(item.category || "Uncategorised")}</div></td>
-      <td>${esc(item.sku)}</td><td>${Number(item.unit_price) > 0 ? money(item.unit_price) : '<span class="pill warning">Set price</span>'}</td><td><span class="pill${item.stock === 0 ? " danger" : item.stock <= item.reorder_level ? " warning" : ""}">${item.stock === 0 ? "Out of stock" : `${item.stock} units`}</span></td>
+      <td>${esc(item.sku)}</td><td>${money(item.buying_price || 0)}</td><td>${Number(item.unit_price) > 0 ? money(item.unit_price) : '<span class="pill warning">Set price</span>'}</td><td><span class="pill${item.stock === 0 ? " danger" : item.stock <= item.reorder_level ? " warning" : ""}">${item.stock === 0 ? "Out of stock" : `${item.stock} units`}</span></td>
       <td>${item.reorder_level}</td><td><div class="heading-actions"><button class="secondary" data-action="adjust-stock" data-id="${item.id}">Adjust stock</button><button class="secondary" data-action="edit-product" data-id="${item.id}">Edit</button></div></td></tr>`).join("");
   return `
     <div class="page-heading"><div><h1>Inventory</h1><p>Manage products, prices, and available stock.</p></div><div class="heading-actions"><button class="secondary" data-action="add-starter-products">Add popular products</button><button class="primary" data-action="add-product">＋ Add product</button></div></div>
-    <div class="notice">Add a starter range of popular phone, TV, audio, accessory, networking, computer, and appliance brands. Prices and stock are left blank for you to enter.</div>
+    <div class="notice">Buying price shows the cost from the latest restock. Selling price is your usual asking price; you can change the agreed price for each sale at checkout.</div>
     <section class="panel">
       <div class="toolbar"><div class="search-box"><span>⌕</span><input id="product-search" type="search" placeholder="Search by product, SKU or category" value="${esc(productSearch)}"></div><span class="subtle">${filtered.length} of ${store.products.length} products</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Alert level</th><th>Actions</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-state">No products found. Add your first product to get started.</td></tr>'}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th>Buying price</th><th>Selling price</th><th>Stock</th><th>Alert level</th><th>Actions</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="empty-state">No products found. Add your first product to get started.</td></tr>'}</tbody></table></div>
     </section>`;
 }
 
@@ -271,10 +275,10 @@ function renderPos() {
     const needsPrice = Number(item.unit_price) <= 0;
     const outOfStock = item.stock <= 0;
     const status = needsPrice ? "Set price in inventory" : outOfStock ? "Out of stock" : `${item.stock} in stock`;
-    return `<button class="pos-product" data-action="add-to-cart" data-id="${item.id}" ${needsPrice || outOfStock ? "disabled" : ""}><div class="product-main">${esc(item.name)}</div><div class="product-sub">${esc(item.sku)} · ${status}</div><div class="pos-price">${needsPrice ? "Price needed" : money(item.unit_price)}</div></button>`;
+    return `<button class="pos-product" data-action="add-to-cart" data-id="${item.id}" ${outOfStock ? "disabled" : ""}><div class="product-main">${esc(item.name)}</div><div class="product-sub">${esc(item.sku)} · ${outOfStock ? status : needsPrice ? "Enter agreed price in sale" : status}</div><div class="pos-price">${needsPrice ? "Set price at checkout" : money(item.unit_price)}</div></button>`;
   }).join("");
-  const cartMarkup = cart.map((entry) => `<div class="cart-row"><div><div class="cart-name">${esc(entry.product.name)}</div><div class="cart-unit">${money(entry.product.unit_price)} each</div></div><div class="quantity-control"><button data-action="cart-minus" data-id="${entry.product.id}" aria-label="Decrease quantity">−</button><span>${entry.quantity}</span><button data-action="cart-plus" data-id="${entry.product.id}" aria-label="Increase quantity">+</button></div><div class="cart-line">${money(entry.quantity * entry.product.unit_price)}</div></div>`).join("");
-  const total = cart.reduce((sum, entry) => sum + entry.quantity * Number(entry.product.unit_price), 0);
+  const cartMarkup = cart.map((entry) => `<div class="cart-row"><div><div class="cart-name">${esc(entry.product.name)}</div><label class="cart-price">Agreed selling price (${esc(store.settings.currency)})<input type="number" min="0.01" step="0.01" required data-sale-price-for="${entry.product.id}" value="${entry.sale_price || ""}" aria-label="Agreed selling price for ${esc(entry.product.name)}"></label></div><div class="cart-quantity"><div class="quantity-control"><button data-action="cart-minus" data-id="${entry.product.id}" aria-label="Decrease quantity">−</button><span>${entry.quantity}</span><button data-action="cart-plus" data-id="${entry.product.id}" aria-label="Increase quantity">+</button></div><div class="cart-line">${money(entry.quantity * entry.sale_price)}</div></div></div>`).join("");
+  const total = cart.reduce((sum, entry) => sum + entry.quantity * Number(entry.sale_price), 0);
   return `
     <div class="page-heading"><div><h1>Checkout</h1><p>Add products to a sale and complete checkout.</p></div></div>
     <div class="pos-layout">
@@ -282,8 +286,8 @@ function renderPos() {
       <section class="panel"><div class="panel-heading"><div><h2>Current sale</h2><div class="subtle">${cart.length} item type${cart.length === 1 ? "" : "s"}</div></div><button class="text-button" data-action="clear-cart">Clear</button></div>
         ${cartMarkup || '<div class="empty-state">Your sale is empty.<br>Choose products to add them here.</div>'}
         <div class="field"><label for="payment-method">Payment method</label><select id="payment-method"><option ${paymentMethod === "Cash" ? "selected" : ""}>Cash</option><option ${paymentMethod === "M-Pesa" ? "selected" : ""}>M-Pesa</option><option ${paymentMethod === "Card" ? "selected" : ""}>Card</option><option ${paymentMethod === "Other" ? "selected" : ""}>Other</option></select></div>
-        <div class="cart-total"><span>Total due</span><strong>${money(total)}</strong></div>
-        <button class="primary wide" data-action="checkout" ${cart.length === 0 ? "disabled" : ""}>Complete sale · ${money(total)}</button>
+        <div class="cart-total"><span>Total due</span><strong id="cart-total-value">${money(total)}</strong></div>
+        <button id="checkout-button" class="primary wide" data-action="checkout" ${cart.length === 0 ? "disabled" : ""}>Complete sale · ${money(total)}</button>
       </section>
     </div>`;
 }
@@ -365,8 +369,8 @@ function showProductModal(product = null) {
     <div class="field"><label for="product-sku">SKU</label><input id="product-sku" name="sku" required maxlength="60" value="${esc(product?.sku || "")}" placeholder="e.g. PHONE-001"></div>
     <div class="field"><label for="product-name">Product name</label><input id="product-name" name="name" required maxlength="120" value="${esc(product?.name || "")}"></div>
     <div class="field"><label for="product-category">Category</label><input id="product-category" name="category" maxlength="80" value="${esc(product?.category || "")}" placeholder="Phones, accessories…"></div>
-    <div class="field"><label for="product-price">Selling price (${esc(store.settings.currency)})</label><input id="product-price" name="unit_price" type="number" min="0" step="0.01" required value="${esc(product?.unit_price ?? "")}"></div>
-    ${product ? "" : `<div class="field"><label for="product-stock">Opening stock</label><input id="product-stock" name="initial_stock" type="number" min="0" step="1" required value="0"></div>`}
+    <div class="field"><label for="product-price">Usual selling price (${esc(store.settings.currency)})</label><input id="product-price" name="unit_price" type="number" min="0" step="0.01" required value="${esc(product?.unit_price ?? "")}"></div>
+    ${product ? "" : `<div class="field"><label for="product-stock">Opening stock</label><input id="product-stock" name="initial_stock" type="number" min="0" step="1" required value="0"></div><div class="field"><label for="product-buying-price">Buying price per unit (${esc(store.settings.currency)})</label><input id="product-buying-price" name="buying_price" type="number" min="0" step="0.01" value="0"><span class="subtle">Required when opening stock is above zero.</span></div>`}
     <div class="field"><label for="product-reorder">Low-stock alert level</label><input id="product-reorder" name="reorder_level" type="number" min="0" step="1" required value="${esc(product?.reorder_level ?? 5)}"></div>
   </div>${product ? '<p class="subtle">Use “Adjust stock” to receive or remove units. Stock cannot be edited here.</p>' : ""}`;
   openModal(product ? "Edit product" : "Add product", body);
@@ -376,6 +380,7 @@ function showProductModal(product = null) {
 function showStockModal(product) {
   openModal("Adjust stock", `<p class="subtle">${esc(product.name)} · Current stock: <strong>${product.stock}</strong></p>
     <div class="field"><label for="stock-delta">Quantity change</label><input id="stock-delta" name="delta" type="number" step="1" required placeholder="Use a positive number to receive stock"></div>
+    <div class="field"><label for="stock-buying-price">Buying price per unit (${esc(store.settings.currency)})</label><input id="stock-buying-price" name="buying_price" type="number" min="0" step="0.01" placeholder="Required when receiving stock"><span class="subtle">Recorded as the cost for this restock. Only applies to added units.</span></div>
     <div class="field"><label for="stock-reason">Reason</label><select id="stock-reason" name="reason" required><option value="Restock">Restock / delivery</option><option value="Correction">Stock correction</option><option value="Return">Customer return</option><option value="Damaged">Damaged / write-off</option></select></div>
     <p class="subtle">Enter a negative number to reduce stock. Stock cannot go below zero.</p>`);
   document.querySelector("#modal-form").dataset.productId = product.id;
@@ -419,6 +424,7 @@ function validateBackup(value) {
       typeof product.id !== "string" || productIds.has(product.id) ||
       typeof product.sku !== "string" || typeof product.name !== "string" ||
       !Number.isFinite(Number(product.unit_price)) ||
+      (product.buying_price !== undefined && (!Number.isFinite(Number(product.buying_price)) || Number(product.buying_price) < 0)) ||
       !Number.isInteger(product.stock) || product.stock < 0 ||
       !Number.isInteger(product.reorder_level) || product.reorder_level < 0
     ) throw new Error("Backup contains an invalid product record.");
@@ -434,7 +440,7 @@ function validateBackup(value) {
     version: 1,
     starter_catalogue_initialized: true,
     settings: { ...DEFAULT_SETTINGS, ...value.settings },
-    products: value.products,
+    products: value.products.map((product) => ({ ...product, buying_price: Number(product.buying_price) || 0 })),
     sales: value.sales,
     movements: value.movements,
   };
@@ -449,14 +455,17 @@ function checkout() {
     if (!product || product.stock < entry.quantity) {
       throw new Error(`Not enough stock for ${entry.product.name}. Review the quantity and try again.`);
     }
+    if (!Number.isFinite(Number(entry.sale_price)) || Number(entry.sale_price) <= 0) {
+      throw new Error(`Enter the agreed selling price for ${entry.product.name} before completing the sale.`);
+    }
     product.stock -= entry.quantity;
-    const lineTotal = Number((entry.quantity * Number(product.unit_price)).toFixed(2));
+    const lineTotal = Number((entry.quantity * Number(entry.sale_price)).toFixed(2));
     saleItems.push({
       product_id: product.id,
       sku: product.sku,
       product_name: product.name,
       quantity: entry.quantity,
-      unit_price: Number(product.unit_price),
+      unit_price: Number(entry.sale_price),
       line_total: lineTotal,
     });
   }
@@ -509,10 +518,18 @@ app.addEventListener("submit", (event) => {
       const product = next.products.find((item) => item.id === productId);
       if (!product) throw new Error("Product not found.");
       if (product.stock + delta < 0) throw new Error("Stock cannot be reduced below zero.");
+      let buyingPrice;
+      if (delta > 0) {
+        if (values.buying_price === "") throw new Error("Enter the buying price per unit for this restock.");
+        buyingPrice = Number(values.buying_price);
+        if (!Number.isFinite(buyingPrice) || buyingPrice < 0) throw new Error("Enter a valid non-negative buying price.");
+        product.buying_price = buyingPrice;
+      }
       product.stock += delta;
       next.movements.push({
         id: createId(), product_id: product.id, sku: product.sku, product_name: product.name,
-        quantity_change: delta, reason: String(values.reason), created_at: new Date().toISOString(),
+        quantity_change: delta, reason: String(values.reason), ...(delta > 0 ? { unit_cost: buyingPrice } : {}),
+        created_at: new Date().toISOString(),
       });
       persist(next);
       closeModal();
@@ -542,11 +559,14 @@ app.addEventListener("submit", (event) => {
     } else {
       const initialStock = Number(values.initial_stock);
       if (!Number.isInteger(initialStock) || initialStock < 0) throw new Error("Opening stock must be a non-negative whole number.");
-      const product = { id: createId(), ...fields, stock: initialStock, created_at: new Date().toISOString() };
+      if (initialStock > 0 && values.buying_price === "") throw new Error("Enter the buying price per unit for the opening stock.");
+      const buyingPrice = values.buying_price === "" ? 0 : Number(values.buying_price);
+      if (!Number.isFinite(buyingPrice) || buyingPrice < 0) throw new Error("Enter a valid non-negative buying price.");
+      const product = { id: createId(), ...fields, buying_price: buyingPrice, stock: initialStock, created_at: new Date().toISOString() };
       next.products.push(product);
       if (initialStock > 0) next.movements.push({
         id: createId(), product_id: product.id, sku: product.sku, product_name: product.name,
-        quantity_change: initialStock, reason: "Opening stock", created_at: product.created_at,
+        quantity_change: initialStock, unit_cost: buyingPrice, reason: "Opening stock", created_at: product.created_at,
       });
     }
     persist(next);
@@ -570,7 +590,22 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("change", async (event) => {
-  if (event.target.id === "report-month") {
+  if (event.target.matches("[data-sale-price-for]")) {
+    const input = event.target;
+    const entry = cart.find((item) => item.product.id === input.dataset.salePriceFor);
+    const price = Number(input.value);
+    if (!entry) return;
+    if (input.value === "" || !Number.isFinite(price) || price <= 0 || !input.validity.valid) {
+      reportError(new Error("Enter an agreed selling price greater than zero."));
+      input.value = entry.sale_price > 0 ? String(entry.sale_price) : "";
+      return;
+    }
+    entry.sale_price = price;
+    input.closest(".cart-row").querySelector(".cart-line").textContent = money(entry.quantity * price);
+    const total = cart.reduce((sum, item) => sum + item.quantity * Number(item.sale_price), 0);
+    document.querySelector("#cart-total-value").textContent = money(total);
+    document.querySelector("#checkout-button").textContent = `Complete sale · ${money(total)}`;
+  } else if (event.target.id === "report-month") {
     reportMonth = event.target.value || localMonth();
     renderApp();
   } else if (event.target.id === "payment-method") {
@@ -634,7 +669,7 @@ app.addEventListener("click", (event) => {
       const line = cart.find((entry) => entry.product.id === id);
       if (product && (line?.quantity || 0) < product.stock) {
         if (line) line.quantity += 1;
-        else cart.push({ product: { ...product }, quantity: 1 });
+        else cart.push({ product: { ...product }, quantity: 1, sale_price: Number(product.unit_price) || 0 });
         renderApp();
       } else if (product) toast("There is not enough stock to add another unit.", true);
     } else if (action === "cart-minus" || action === "cart-plus") {

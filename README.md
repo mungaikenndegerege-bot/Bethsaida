@@ -4,9 +4,10 @@ A lightweight point-of-sale and inventory app for Bethsaida Electronics. GitHub 
 
 ## Features
 
-- Product catalogue with SKU, category, selling price, opening stock, and low-stock alerts.
+- Product catalogue with SKU, category, last restock buying price, usual selling price, opening stock, and low-stock alerts.
 - Starter catalogue of popular Kenyan-market phone, TV, sound, accessory, networking, computer, and appliance models, automatically added on first use when inventory is empty; enter your own prices and stock.
 - Point of sale with receipt numbers, payment method, and stock checks.
+- Record the buying cost for each restock and enter a negotiated selling price for each sale.
 - Stock adjustments with a local movement history.
 - Monthly sales summary and CSV download.
 - JSON backup download and restore.
