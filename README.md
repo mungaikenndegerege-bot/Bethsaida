@@ -9,6 +9,7 @@ A lightweight point-of-sale and inventory app for Bethsaida Electronics. GitHub 
 - Point of sale with receipt numbers, payment method, and stock checks.
 - Record the buying cost for each restock and enter a negotiated selling price for each sale.
 - Stock adjustments with a local movement history.
+- Clear a product's stock, delete mistaken products, or delete a sale from monthly reports. Confirmations warn before deletion; deleting a sale removes it from reports and restores stock for products that still exist.
 - Monthly sales summary and CSV download.
 - JSON backup download and restore.
 - Prices default to Kenyan shillings (KES).

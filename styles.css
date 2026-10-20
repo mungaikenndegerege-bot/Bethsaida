@@ -36,6 +36,7 @@ button { cursor: pointer; }
 .secondary { background: white; border: 1px solid var(--line); padding: 10px 14px; color: var(--ink); }
 .secondary:hover { background: #f8faf8; border-color: #cbd6ce; }
 .danger-button { padding: 8px 10px; background: #fff2f1; color: var(--red); }
+.danger-button:hover { background: #ffe7e5; }
 .text-button { border: 0; background: none; color: var(--green); font-weight: 700; padding: 0; }
 .wide { width: 100%; }
 .auth-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 21px; font-size: 13px; }
@@ -65,6 +66,7 @@ button { cursor: pointer; }
 .page-heading h1 { font: 800 26px Manrope, sans-serif; letter-spacing: -.8px; margin: 0; }
 .page-heading p { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
 .heading-actions { display: flex; gap: 9px; }
+.inventory-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; }
 .stat-card, .panel { border: 1px solid var(--line); border-radius: 14px; background: white; }
 .stat-card { padding: 17px 18px; }

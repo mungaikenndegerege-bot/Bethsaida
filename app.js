@@ -259,7 +259,7 @@ function renderInventory() {
   const rows = filtered.map((item) => `
     <tr><td><div class="product-main">${esc(item.name)}</div><div class="product-sub">${esc(item.category || "Uncategorised")}</div></td>
       <td>${esc(item.sku)}</td><td>${money(item.buying_price || 0)}</td><td>${Number(item.unit_price) > 0 ? money(item.unit_price) : '<span class="pill warning">Set price</span>'}</td><td><span class="pill${item.stock === 0 ? " danger" : item.stock <= item.reorder_level ? " warning" : ""}">${item.stock === 0 ? "Out of stock" : `${item.stock} units`}</span></td>
-      <td>${item.reorder_level}</td><td><div class="heading-actions"><button class="secondary" data-action="adjust-stock" data-id="${item.id}">Adjust stock</button><button class="secondary" data-action="edit-product" data-id="${item.id}">Edit</button></div></td></tr>`).join("");
+      <td>${item.reorder_level}</td><td><div class="inventory-actions"><button class="secondary" data-action="adjust-stock" data-id="${item.id}">Adjust stock</button><button class="secondary" data-action="edit-product" data-id="${item.id}">Edit</button>${item.stock > 0 ? `<button class="secondary" data-action="clear-stock" data-id="${item.id}">Clear stock</button>` : ""}<button class="danger-button" data-action="delete-product" data-id="${item.id}">Delete product</button></div></td></tr>`).join("");
   return `
     <div class="page-heading"><div><h1>Inventory</h1><p>Manage products, prices, and available stock.</p></div><div class="heading-actions"><button class="secondary" data-action="add-starter-products">Add popular products</button><button class="primary" data-action="add-product">＋ Add product</button></div></div>
     <div class="notice">Buying price shows the cost from the latest restock. Selling price is your usual asking price; you can change the agreed price for each sale at checkout.</div>
@@ -311,6 +311,11 @@ function makeReport(month) {
 
 function renderReports() {
   reportData = makeReport(reportMonth);
+  const saleRows = reportData.sales.map((sale) => {
+    const items = sale.items.map((item) => `${esc(item.product_name)} × ${item.quantity} @ ${money(item.unit_price)} = ${money(item.line_total)}`).join("<br>");
+    const units = sale.items.reduce((sum, item) => sum + item.quantity, 0);
+    return `<tr><td>${dateTime(sale.created_at)}</td><td>${esc(sale.receipt_number)}</td><td>${items}</td><td>${units}</td><td>${money(sale.total)}</td><td><button class="danger-button" data-action="delete-sale" data-id="${sale.id}">Delete sale</button></td></tr>`;
+  }).join("");
   const summary = `
     <div class="report-summary">
       <div class="report-card"><span>Sales revenue</span><strong>${money(reportData.revenue)}</strong></div>
@@ -318,7 +323,7 @@ function renderReports() {
       <div class="report-card"><span>Units sold</span><strong>${reportData.units.toLocaleString("en-KE")}</strong></div>
     </div>
     <section class="panel"><div class="panel-heading"><div><h2>Sales detail</h2><div class="subtle">Line items for the selected month</div></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Receipt</th><th>Product</th><th>Qty</th><th>Unit price</th><th>Line total</th></tr></thead><tbody>${reportData.lines.length ? reportData.lines.map((line) => `<tr><td>${dateTime(line.created_at)}</td><td>${esc(line.receipt_number)}</td><td>${esc(line.product_name)}</td><td>${line.quantity}</td><td>${money(line.unit_price)}</td><td>${money(line.line_total)}</td></tr>`).join("") : '<tr><td colspan="6" class="empty-state">No sales recorded for this month.</td></tr>'}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Receipt</th><th>Items</th><th>Qty</th><th>Total</th><th>Actions</th></tr></thead><tbody>${saleRows || '<tr><td colspan="6" class="empty-state">No sales recorded for this month.</td></tr>'}</tbody></table></div>
     </section>`;
   return `
     <div class="page-heading"><div><h1>Reports</h1><p>Review monthly sales and download a spreadsheet for your records.</p></div></div>
@@ -493,6 +498,68 @@ function checkout() {
   toast(`Sale completed. Receipt ${receipt}.`);
 }
 
+function clearProductStock(productId) {
+  const product = store.products.find((item) => item.id === productId);
+  if (!product || product.stock <= 0) return;
+  if (!window.confirm(`Clear all ${product.stock} units of ${product.name} from stock? This will not delete any sales.`)) return;
+  const next = structuredClone(store);
+  const target = next.products.find((item) => item.id === productId);
+  const clearedQuantity = target.stock;
+  target.stock = 0;
+  next.movements.push({
+    id: createId(),
+    product_id: target.id,
+    sku: target.sku,
+    product_name: target.name,
+    quantity_change: -clearedQuantity,
+    reason: "Stock cleared",
+    created_at: new Date().toISOString(),
+  });
+  persist(next);
+  renderApp();
+  toast(`${product.name} stock cleared.`);
+}
+
+function deleteProduct(productId) {
+  const product = store.products.find((item) => item.id === productId);
+  if (!product) return;
+  const warning = product.stock > 0 ? ` This also removes its ${product.stock} units from inventory.` : "";
+  if (!window.confirm(`Delete ${product.name}? This cannot be undone.${warning} Existing sales and stock history will remain in reports/history.`)) return;
+  const next = structuredClone(store);
+  next.products = next.products.filter((item) => item.id !== productId);
+  persist(next);
+  cart = cart.filter((item) => item.product.id !== productId);
+  renderApp();
+  toast(`${product.name} deleted.`);
+}
+
+function deleteSale(saleId) {
+  const sale = store.sales.find((item) => item.id === saleId);
+  if (!sale) return;
+  if (!window.confirm(`Delete sale ${sale.receipt_number} (${money(sale.total)})? This removes it from reports and restores sold quantities for products still in inventory.`)) return;
+  const next = structuredClone(store);
+  const deletedSale = next.sales.find((item) => item.id === saleId);
+  const now = new Date().toISOString();
+  for (const line of deletedSale.items) {
+    const product = next.products.find((item) => item.id === line.product_id);
+    if (!product) continue;
+    product.stock += line.quantity;
+    next.movements.push({
+      id: createId(),
+      product_id: product.id,
+      sku: product.sku,
+      product_name: product.name,
+      quantity_change: line.quantity,
+      reason: `Sale deleted ${deletedSale.receipt_number}`,
+      created_at: now,
+    });
+  }
+  next.sales = next.sales.filter((item) => item.id !== saleId);
+  persist(next);
+  renderApp();
+  toast(`Sale ${sale.receipt_number} deleted and stock restored where possible.`);
+}
+
 app.addEventListener("submit", (event) => {
   event.preventDefault();
   const form = event.target;
@@ -664,6 +731,12 @@ app.addEventListener("click", (event) => {
     } else if (action === "adjust-stock") {
       const product = store.products.find((item) => item.id === id);
       if (product) showStockModal(product);
+    } else if (action === "clear-stock") {
+      clearProductStock(id);
+    } else if (action === "delete-product") {
+      deleteProduct(id);
+    } else if (action === "delete-sale") {
+      deleteSale(id);
     } else if (action === "add-to-cart") {
       const product = store.products.find((item) => item.id === id);
       const line = cart.find((entry) => entry.product.id === id);
