@@ -9,6 +9,40 @@ const navItems = [
   ["settings", "Settings", "⚙"],
 ];
 const DEFAULT_SETTINGS = { shop_name: "Bethsaida Electronics", currency: "KES" };
+const STARTER_PRODUCTS = [
+  ["SAM-A05S", "Samsung Galaxy A05s", "Phones"],
+  ["SAM-A15", "Samsung Galaxy A15", "Phones"],
+  ["SAM-A25-5G", "Samsung Galaxy A25 5G", "Phones"],
+  ["SAM-A35-5G", "Samsung Galaxy A35 5G", "Phones"],
+  ["SAM-S24-FE", "Samsung Galaxy S24 FE", "Phones"],
+  ["TEC-SPARK-30C", "Tecno Spark 30C", "Phones"],
+  ["TEC-CAMON-30", "Tecno Camon 30", "Phones"],
+  ["TEC-CAMON-40-PRO", "Tecno Camon 40 Pro", "Phones"],
+  ["INF-HOT-50I", "Infinix Hot 50i", "Phones"],
+  ["INF-NOTE-40", "Infinix Note 40", "Phones"],
+  ["RED-14C", "Redmi 14C", "Phones"],
+  ["RED-NOTE-13", "Redmi Note 13", "Phones"],
+  ["SAM-TV-43-CRYSTAL", "Samsung 43-inch Crystal UHD Smart TV", "Televisions"],
+  ["HIS-TV-32-A4N", "Hisense 32-inch A4N Smart TV", "Televisions"],
+  ["HIS-TV-55-U6N", "Hisense 55-inch U6N QLED Smart TV", "Televisions"],
+  ["TCL-TV-43-S5K", "TCL 43-inch S5K Smart TV", "Televisions"],
+  ["VIS-TV-32-FRAMELESS", "Vision Plus 32-inch Frameless Smart TV", "Televisions"],
+  ["VIT-TV-43-ANDROID", "Vitron 43-inch Android Smart TV", "Televisions"],
+  ["SAM-SOUNDBAR-C450", "Samsung HW-C450 Soundbar", "Sound systems"],
+  ["HIS-SOUNDBAR-HS2100", "Hisense HS2100 Soundbar", "Sound systems"],
+  ["SONY-MHC-V13", "Sony MHC-V13 High Power Audio System", "Sound systems"],
+  ["JBL-PARTYBOX-ENCORE", "JBL PartyBox Encore Essential", "Sound systems"],
+  ["ORAIMO-SPACEBOX-PRO", "Oraimo SpaceBox Pro Speaker", "Sound systems"],
+  ["ORAIMO-FREEPODS-LITE", "Oraimo FreePods Lite Earbuds", "Accessories"],
+  ["ORAIMO-POWERBOX-20", "Oraimo PowerBox 20 Power Bank", "Accessories"],
+  ["ANKER-POWERCORE-20K", "Anker 20,000mAh Power Bank", "Accessories"],
+  ["SAM-ADAPTER-25W", "Samsung 25W USB-C Charger", "Accessories"],
+  ["TP-LINK-ARCHER-C6", "TP-Link Archer C6 Wi-Fi Router", "Networking"],
+  ["HP-15S-LAPTOP", "HP 15s Laptop", "Computers"],
+  ["LENOVO-IDEAPAD-SLIM3", "Lenovo IdeaPad Slim 3 Laptop", "Computers"],
+  ["VON-REFRIGERATOR-260L", "Von 260L Double-Door Refrigerator", "Appliances"],
+  ["RAMTONS-MICROWAVE-20L", "Ramtons 20L Microwave Oven", "Appliances"],
+];
 
 let page = "dashboard";
 let store = { version: 1, settings: { ...DEFAULT_SETTINGS }, products: [], sales: [], movements: [] };
@@ -152,7 +186,9 @@ function renderDashboard() {
   const today = localDay();
   const sales = store.sales.filter((sale) => localDay(sale.created_at) === today)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const lowStock = store.products.filter((item) => item.stock <= item.reorder_level);
+  const lowStock = store.products.filter((item) =>
+    item.stock <= item.reorder_level && (Number(item.unit_price) > 0 || item.stock > 0)
+  );
   const unitsSold = sales.reduce((sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
   const revenue = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
   const lowStockRows = lowStock.slice(0, 6).map((item) => `
@@ -188,10 +224,11 @@ function renderInventory() {
   const filtered = store.products.filter((item) => `${item.name} ${item.sku} ${item.category || ""}`.toLowerCase().includes(productSearch.toLowerCase()));
   const rows = filtered.map((item) => `
     <tr><td><div class="product-main">${esc(item.name)}</div><div class="product-sub">${esc(item.category || "Uncategorised")}</div></td>
-      <td>${esc(item.sku)}</td><td>${money(item.unit_price)}</td><td><span class="pill${item.stock === 0 ? " danger" : item.stock <= item.reorder_level ? " warning" : ""}">${item.stock} units</span></td>
+      <td>${esc(item.sku)}</td><td>${Number(item.unit_price) > 0 ? money(item.unit_price) : '<span class="pill warning">Set price</span>'}</td><td><span class="pill${item.stock === 0 ? " danger" : item.stock <= item.reorder_level ? " warning" : ""}">${item.stock === 0 ? "Out of stock" : `${item.stock} units`}</span></td>
       <td>${item.reorder_level}</td><td><div class="heading-actions"><button class="secondary" data-action="adjust-stock" data-id="${item.id}">Adjust stock</button><button class="secondary" data-action="edit-product" data-id="${item.id}">Edit</button></div></td></tr>`).join("");
   return `
-    <div class="page-heading"><div><h1>Inventory</h1><p>Manage products, prices, and available stock.</p></div><div class="heading-actions"><button class="primary" data-action="add-product">＋ Add product</button></div></div>
+    <div class="page-heading"><div><h1>Inventory</h1><p>Manage products, prices, and available stock.</p></div><div class="heading-actions"><button class="secondary" data-action="add-starter-products">Add popular products</button><button class="primary" data-action="add-product">＋ Add product</button></div></div>
+    <div class="notice">Add a starter range of popular phone, TV, audio, accessory, networking, computer, and appliance brands. Prices and stock are left blank for you to enter.</div>
     <section class="panel">
       <div class="toolbar"><div class="search-box"><span>⌕</span><input id="product-search" type="search" placeholder="Search by product, SKU or category" value="${esc(productSearch)}"></div><span class="subtle">${filtered.length} of ${store.products.length} products</span></div>
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Stock</th><th>Alert level</th><th>Actions</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty-state">No products found. Add your first product to get started.</td></tr>'}</tbody></table></div>
@@ -200,7 +237,12 @@ function renderInventory() {
 
 function renderPos() {
   const available = store.products.filter((item) => `${item.name} ${item.sku}`.toLowerCase().includes(productSearch.toLowerCase()));
-  const catalog = available.map((item) => `<button class="pos-product" data-action="add-to-cart" data-id="${item.id}" ${item.stock <= 0 ? "disabled" : ""}><div class="product-main">${esc(item.name)}</div><div class="product-sub">${esc(item.sku)} · ${item.stock} in stock</div><div class="pos-price">${money(item.unit_price)}</div></button>`).join("");
+  const catalog = available.map((item) => {
+    const needsPrice = Number(item.unit_price) <= 0;
+    const outOfStock = item.stock <= 0;
+    const status = needsPrice ? "Set price in inventory" : outOfStock ? "Out of stock" : `${item.stock} in stock`;
+    return `<button class="pos-product" data-action="add-to-cart" data-id="${item.id}" ${needsPrice || outOfStock ? "disabled" : ""}><div class="product-main">${esc(item.name)}</div><div class="product-sub">${esc(item.sku)} · ${status}</div><div class="pos-price">${needsPrice ? "Price needed" : money(item.unit_price)}</div></button>`;
+  }).join("");
   const cartMarkup = cart.map((entry) => `<div class="cart-row"><div><div class="cart-name">${esc(entry.product.name)}</div><div class="cart-unit">${money(entry.product.unit_price)} each</div></div><div class="quantity-control"><button data-action="cart-minus" data-id="${entry.product.id}" aria-label="Decrease quantity">−</button><span>${entry.quantity}</span><button data-action="cart-plus" data-id="${entry.product.id}" aria-label="Increase quantity">+</button></div><div class="cart-line">${money(entry.quantity * entry.product.unit_price)}</div></div>`).join("");
   const total = cart.reduce((sum, entry) => sum + entry.quantity * Number(entry.product.unit_price), 0);
   return `
@@ -535,6 +577,29 @@ app.addEventListener("click", (event) => {
       renderApp();
     } else if (action === "add-product") {
       showProductModal();
+    } else if (action === "add-starter-products") {
+      const knownSkus = new Set(store.products.map((product) => product.sku.toLowerCase()));
+      const additions = STARTER_PRODUCTS.filter(([sku]) => !knownSkus.has(sku.toLowerCase()));
+      if (!additions.length) {
+        toast("The starter products are already in your inventory.");
+        return;
+      }
+      if (!window.confirm(`Add ${additions.length} popular electronics products? Prices and stock will be set to 0 for you to fill in. Existing products and sales will not be changed.`)) return;
+      const now = new Date().toISOString();
+      const next = structuredClone(store);
+      next.products.push(...additions.map(([sku, name, category]) => ({
+        id: createId(),
+        sku,
+        name,
+        category,
+        unit_price: 0,
+        stock: 0,
+        reorder_level: 0,
+        created_at: now,
+      })));
+      persist(next);
+      renderApp();
+      toast(`${additions.length} starter products added. Set each selling price and stock in inventory.`);
     } else if (action === "edit-product") {
       const product = store.products.find((item) => item.id === id);
       if (product) showProductModal(product);

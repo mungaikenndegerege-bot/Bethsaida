@@ -5,6 +5,7 @@ A lightweight point-of-sale and inventory app for Bethsaida Electronics. GitHub 
 ## Features
 
 - Product catalogue with SKU, category, selling price, opening stock, and low-stock alerts.
+- One-click starter catalogue of popular Kenyan-market phone, TV, sound, accessory, networking, computer, and appliance models; enter your own prices and stock.
 - Point of sale with receipt numbers, payment method, and stock checks.
 - Stock adjustments with a local movement history.
 - Monthly sales summary and CSV download.
@@ -20,6 +21,8 @@ The website itself is public on GitHub Pages. Shop records remain on the device 
 ## Open the published app
 
 Visit <https://mungaikenndegerege-bot.github.io/Bethsaida/>. The static app is deployed by the GitHub Actions workflow whenever changes are pushed to `main`.
+
+In **Inventory**, choose **Add popular products** to add the starter catalogue. It adds product names and SKUs only: selling prices and stock start at zero, existing products and sales are preserved, and a confirmation appears before the products are added. Set prices and receive stock before those products can be sold.
 
 To run locally from this folder:
 
