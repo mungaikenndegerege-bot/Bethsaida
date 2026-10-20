@@ -45,7 +45,14 @@ const STARTER_PRODUCTS = [
 ];
 
 let page = "dashboard";
-let store = { version: 1, settings: { ...DEFAULT_SETTINGS }, products: [], sales: [], movements: [] };
+let store = {
+  version: 1,
+  starter_catalogue_initialized: false,
+  settings: { ...DEFAULT_SETTINGS },
+  products: [],
+  sales: [],
+  movements: [],
+};
 let cart = [];
 let reportMonth = localMonth();
 let reportData = null;
@@ -125,26 +132,49 @@ function persist(nextStore) {
 
 function loadStore() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return;
-  const parsed = JSON.parse(saved);
-  if (
-    !parsed || parsed.version !== 1 || !parsed.settings ||
+  const parsed = saved ? JSON.parse(saved) : null;
+  if (parsed && (
+    parsed.version !== 1 || !parsed.settings ||
     !Array.isArray(parsed.products) || !Array.isArray(parsed.sales) ||
     !Array.isArray(parsed.movements)
-  ) {
+  )) {
     throw new Error("Saved shop data is invalid. Do not clear browser storage; restore a valid backup or contact support.");
   }
-  store = {
+  const nextStore = {
     version: 1,
-    settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
-    products: parsed.products,
-    sales: parsed.sales,
-    movements: parsed.movements,
+    starter_catalogue_initialized: parsed?.starter_catalogue_initialized === true,
+    settings: { ...DEFAULT_SETTINGS, ...(parsed?.settings || {}) },
+    products: parsed?.products || [],
+    sales: parsed?.sales || [],
+    movements: parsed?.movements || [],
   };
+  if (!nextStore.starter_catalogue_initialized) {
+    if (nextStore.products.length === 0) {
+      nextStore.products.push(...createStarterProducts());
+    }
+    nextStore.starter_catalogue_initialized = true;
+    persist(nextStore);
+  } else {
+    store = nextStore;
+  }
 }
 
 function createId() {
   return crypto.randomUUID();
+}
+
+function createStarterProducts() {
+  const now = new Date().toISOString();
+  return STARTER_PRODUCTS.map(([sku, name, category]) => ({
+    id: createId(),
+    sku,
+    name,
+    category,
+    unit_price: 0,
+    stock: 0,
+    reorder_level: 0,
+    created_at: now,
+  }));
 }
 
 function navMarkup() {
@@ -402,6 +432,7 @@ function validateBackup(value) {
   }
   return {
     version: 1,
+    starter_catalogue_initialized: true,
     settings: { ...DEFAULT_SETTINGS, ...value.settings },
     products: value.products,
     sales: value.sales,
@@ -585,18 +616,10 @@ app.addEventListener("click", (event) => {
         return;
       }
       if (!window.confirm(`Add ${additions.length} popular electronics products? Prices and stock will be set to 0 for you to fill in. Existing products and sales will not be changed.`)) return;
-      const now = new Date().toISOString();
       const next = structuredClone(store);
-      next.products.push(...additions.map(([sku, name, category]) => ({
-        id: createId(),
-        sku,
-        name,
-        category,
-        unit_price: 0,
-        stock: 0,
-        reorder_level: 0,
-        created_at: now,
-      })));
+      const additionSkus = new Set(additions.map(([sku]) => sku.toLowerCase()));
+      next.products.push(...createStarterProducts().filter((product) => additionSkus.has(product.sku.toLowerCase())));
+      next.starter_catalogue_initialized = true;
       persist(next);
       renderApp();
       toast(`${additions.length} starter products added. Set each selling price and stock in inventory.`);
